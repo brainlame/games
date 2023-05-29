@@ -5,14 +5,25 @@ import java.awt.event.*;
 import javax.swing.*;
 
 public class Gameboard extends JPanel implements KeyListener,Runnable {
-    private int[][] board = new int[10][4];
-    private int currentRow = 0;
-    private int currentCol = 0;
-    private int[] code = {(int)(Math.random()*6+1),(int)(Math.random()*6+1),(int)(Math.random()*6+1),(int)(Math.random()*6+1)};
-    private String[] feedbacks = new String[10];
+    private int[][] board;
+    private int currentRow, currentCol;
+    private int[] code;
+    private String[] feedbacks;;
+    private String status;
+    private boolean showCode = true;
+    
     public Gameboard() {
+        instantiateVariables();
         addKeyListener(this);
         new Thread(this).start();
+    }
+    public void instantiateVariables() {
+        board = new int[10][4];
+        currentRow = 0; currentCol = 0;
+        code = new int[4];
+        for (int i=0;i<4;i++) code[i] = (int)(Math.random()*6+1);
+        feedbacks = new String[10];
+        status = "";
     }
     public Color decideColor(int num) {
         switch(num) {
@@ -32,6 +43,19 @@ public class Gameboard extends JPanel implements KeyListener,Runnable {
         paintGrid(window);
         paintGridAccessories(window);
         paintFeedback(window);
+        paintWinLoss(window);
+    }
+    public void paintWinLoss(Graphics window) {
+        if (status.equals("win") || status.equals("lose")) {
+            window.setFont(new Font("SansSerif",Font.PLAIN,50));
+            window.setColor(Color.BLACK);
+            window.drawString(status.equals("win") ? "YOU WIN!" : "YOU LOSE!",175,660);
+
+            window.setFont(new Font("Monospace",Font.BOLD,15));
+            window.fillRoundRect(200,700,200,60,10,10);
+            window.setColor(Color.WHITE);
+            window.drawString("SPACE to play again",220,735);
+        }
     }
     public void paintGrid(Graphics window) {
         // print the grid
@@ -45,25 +69,20 @@ public class Gameboard extends JPanel implements KeyListener,Runnable {
                 window.fillOval(x,y,50,50);
                 window.setColor(Color.BLACK);
                 window.setFont(new Font("Sans Serif",Font.PLAIN,30));
-                window.drawString(board[i][j]!=0 ? ""+board[i][j] : "",x+15,y+40);
+                window.drawString(board[i][j] != 0 ? ""+board[i][j] : "",x+15,y+40);
                 x += 50;
             }
             y += 50;
-        }
-
-        // check loss
-        if (currentRow >= 10) {
-            window.setColor(Color.BLACK);
-            window.drawString("YOU LOSE",250,700);
-            removeKeyListener(this);
         }
     }
     public void paintGridAccessories(Graphics window) {
         // print the secret code
         int x = 200, y = 100;
-        for (int i=0;i<4;i++) {
-            window.setColor(decideColor(code[i]));
-            window.fillOval(x+i*50,20,50,50);
+        if (showCode) {
+            for (int i=0;i<4;i++) {
+                window.setColor(decideColor(code[i]));
+                window.fillOval(x+i*50,20,50,50);
+            }
         }
 
         // print the number-color pairs
@@ -93,18 +112,11 @@ public class Gameboard extends JPanel implements KeyListener,Runnable {
                 oCount = feedbacks[i].length() - index;
             }
 
-            // check win
-            if (xCount == 4) {
-                window.setColor(Color.BLACK);
-                window.drawString("YOU WIN!",250,700);
-                removeKeyListener(this);
-            }
-
             // display the feedback
             int y = 100 + 50 * i;
             window.setColor(Color.RED);
             window.fillRoundRect(140,y+5,40,40,10,10);
-            window.setColor(Color.WHITE);
+            window.setColor(Color.LIGHT_GRAY);
             window.fillRoundRect(420,y+5,40,40,10,10);
             window.setColor(Color.BLACK);
             window.drawString(""+xCount,150,y+40);
@@ -112,34 +124,11 @@ public class Gameboard extends JPanel implements KeyListener,Runnable {
         }
     }
     public void place(int type) {
-        if (currentCol >= 4 || currentRow >= 10) {
+        if (currentCol >= 4 || currentRow >= 10 || status.equals("win") || status.equals("loss")) {
             return;
         }
         board[currentRow][currentCol] = type;
         currentCol++;
-    }
-    public String checkGuess() {
-        String ret = "";
-        int[] codeCopy = new int[4];
-        for (int i=0;i<4;i++) codeCopy[i] = code[i];
-
-        for (int i=0;i<4;i++) {
-            if (board[currentRow][i] == codeCopy[i]) {
-                ret += "X";
-                codeCopy[i] = 0;
-            }
-        }
-        for (int i=0;i<4;i++) {
-            for (int j=0;j<4;j++) {
-                if (board[currentRow][i] == codeCopy[j]) {
-                    ret += "O";
-                    codeCopy[j] = 0;
-                }
-            }
-        }
-        currentRow++;
-        currentCol = 0;
-        return ret;
     }
     public void remove() {
         if (currentCol <= 0) {
@@ -148,11 +137,61 @@ public class Gameboard extends JPanel implements KeyListener,Runnable {
         currentCol--;
         board[currentRow][currentCol] = 0;
     }
+    public String checkGuess() {
+        String ret = "";
+        int[] codeCopy = new int[4];
+        int[] guessCopy = new int[4];
+        for (int i=0;i<4;i++) {
+            codeCopy[i] = code[i];
+            guessCopy[i] = board[currentRow][i];
+        }
+
+        for (int i=0;i<4;i++) {
+            if (guessCopy[i] == codeCopy[i] && codeCopy[i] != 0) {
+                ret += "X";
+                codeCopy[i] = 0;
+                guessCopy[i] = 0;
+            }
+        }
+        for (int i=0;i<4;i++) {
+            for (int j=0;j<4;j++) {
+                if (guessCopy[i] == codeCopy[j] && codeCopy[j] != 0) {
+                    ret += "O";
+                    codeCopy[j] = 0;
+                    guessCopy[i] = 0;
+                }
+            }
+        }
+        return ret;
+    }
+    public void enterKey() {
+        if (currentCol == 4 && currentRow < 10) {
+            String feedback = checkGuess();
+            feedbacks[currentRow] = feedback;
+            currentRow++; currentCol = 0;
+
+            // check win / loss
+            if (feedback.indexOf("XXXX") != -1) {
+                status = "win";
+                showCode = !showCode;
+            }
+            else if (currentRow > 9) {
+                status = "lose";
+                showCode = !showCode;
+            }
+        }
+    }
+    public void playAgain() {
+        if (status.equals("win") || status.equals("lose")) {
+            instantiateVariables();
+            showCode = !showCode;
+        }
+    }
     @Override
     public void run() {
         try {
             while(true) {
-                Thread.sleep(15);
+                Thread.sleep(30);
                 repaint();
             }
         } catch (Exception e) {
@@ -171,11 +210,8 @@ public class Gameboard extends JPanel implements KeyListener,Runnable {
             case KeyEvent.VK_5: place(5); break;
             case KeyEvent.VK_6: place(6); break;
             case KeyEvent.VK_BACK_SPACE: remove(); break;
-            case KeyEvent.VK_ENTER: 
-                if (currentCol == 4 && currentRow < 10) {
-                    feedbacks[currentRow] = checkGuess(); 
-                }
-                break;
+            case KeyEvent.VK_ENTER: enterKey(); break;
+            case KeyEvent.VK_SPACE: playAgain(); break;
         }
     }
     @Override
